@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+README*
+DEPLOY*
+
+# Images and media
+image/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+docker-compose.yml
+.dockerignore
+
+# Other
+.env
+.DS_Store
+render.yaml
+
+
+

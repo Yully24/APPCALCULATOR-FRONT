@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Calculadora educativa con explicaciones paso a paso">
+    <meta name="theme-color" content="#2563eb">
+    <title>EduCalc - Calculadora Educativa</title>
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EduCalc">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Preconnect para optimizar -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">📐</span>
+                    EduCalc
+                </h1>
+                <p class="tagline">Aprende matemáticas paso a paso</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            
+            <!-- Calculator Card -->
+            <div class="card calculator-card">
+                <h2 class="card-title">Calculadora</h2>
+                
+                <form id="calculatorForm" class="calculator-form">
+                    <!-- Expression Input -->
+                    <div class="form-group">
+                        <label for="expression" class="form-label">Expresión matemática</label>
+                        <input 
+                            type="text" 
+                            id="expression" 
+                            class="form-input" 
+                            placeholder="Ej: 2*(x+3) - 4"
+                            required
+                            autocomplete="off"
+                        >
+                        <small class="form-hint">Escribe tu expresión matemática</small>
+                    </div>
+
+                    <!-- Mode Selector -->
+                    <div class="form-group">
+                        <label for="mode" class="form-label">Tipo de operación</label>
+                        <select id="mode" class="form-select">
+                            <option value="auto">🤖 Auto (Detectar automáticamente)</option>
+                            <option value="arithmetic">➕ Aritmética básica</option>
+                            <option value="algebra">🔤 Álgebra</option>
+                            <option value="solve">⚖️ Resolver ecuación</option>
+                            <option value="derivative">📈 Derivada</option>
+                            <option value="integral">∫ Integral</option>
+                        </select>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary" id="calculateBtn">
+                        <span class="btn-text">Calcular</span>
+                        <span class="btn-loader" style="display: none;">
+                            <span class="spinner"></span>
+                            Calculando...
+                        </span>
+                    </button>
+                </form>
+
+                <!-- Examples -->
+                <div class="examples">
+                    <p class="examples-title">Ejemplos rápidos:</p>
+                    <div class="examples-list">
+                        <button class="example-btn" data-expr="2 + 3 * 4" data-mode="arithmetic">2 + 3 × 4</button>
+                        <button class="example-btn" data-expr="2*(x+3) - 4" data-mode="algebra">2(x+3) - 4</button>
+                        <button class="example-btn" data-expr="2*x + 5 = 15" data-mode="solve">2x + 5 = 15</button>
+                        <button class="example-btn" data-expr="x**2 + 3*x" data-mode="derivative">d/dx[x² + 3x]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Card (Hidden by default) -->
+            <div id="resultCard" class="card result-card" style="display: none;">
+                <div class="result-header">
+                    <h2 class="card-title">Resultado</h2>
+                    <button id="closeResult" class="btn-close" aria-label="Cerrar">✕</button>
+                </div>
+
+                <div class="result-content">
+                    <!-- Original Expression -->
+                    <div class="result-section">
+                        <p class="result-label">Expresión original:</p>
+                        <p id="originalExpression" class="result-expression"></p>
+                    </div>
+
+                    <!-- Final Result -->
+                    <div class="result-section result-final">
+                        <p class="result-label">Resultado:</p>
+                        <p id="finalResult" class="result-value"></p>
+                    </div>
+
+                    <!-- Steps Toggle -->
+                    <button id="toggleSteps" class="btn btn-secondary">
+                        <span id="toggleStepsText">Ver pasos detallados</span>
+                        <span id="toggleStepsIcon">▼</span>
+                    </button>
+
+                    <!-- Steps List -->
+                    <div id="stepsList" class="steps-container" style="display: none;">
+                        <!-- Steps will be inserted here dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Card (Hidden by default) -->
+            <div id="errorCard" class="card error-card" style="display: none;">
+                <div class="error-header">
+                    <span class="error-icon">⚠️</span>
+                    <h3 class="error-title">Error</h3>
+                    <button id="closeError" class="btn-close" aria-label="Cerrar">✕</button>
+                </div>
+                <p id="errorMessage" class="error-message"></p>
+            </div>
+
+            <!-- Info Section -->
+            <div class="info-section">
+                <div class="info-card">
+                    <h3 class="info-title">💡 ¿Cómo usar?</h3>
+                    <ol class="info-list">
+                        <li>Escribe tu expresión matemática</li>
+                        <li>Selecciona el tipo de operación (o déjalo en Auto)</li>
+                        <li>Presiona "Calcular"</li>
+                        <li>Ve el resultado y los pasos explicados</li>
+                    </ol>
+                </div>
+
+                <div class="info-card">
+                    <h3 class="info-title">📚 Operaciones soportadas</h3>
+                    <ul class="info-list">
+                        <li><strong>Aritmética:</strong> 2 + 3 * 4, (10 - 5) / 2</li>
+                        <li><strong>Álgebra:</strong> 2*(x+3), (x+2)**2</li>
+                        <li><strong>Ecuaciones:</strong> 2*x + 5 = 15</li>
+                        <li><strong>Derivadas:</strong> x**2 + 3*x</li>
+                        <li><strong>Integrales:</strong> x**2, sin(x)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">EduCalc v1.0 - Calculadora Educativa</p>
+            <p class="footer-subtext">Aprende matemáticas con explicaciones paso a paso</p>
+        </div>
+    </footer>
+
+    <!-- Install Button (PWA) -->
+    <button id="installBtn" class="install-btn" style="display: none;">
+        📱 Instalar App
+    </button>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registrado'))
+                    .catch(err => console.log('Service Worker error:', err));
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+
+

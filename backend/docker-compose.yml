@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: educalc-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENVIRONMENT=development
+      - API_RELOAD=true
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8081
+      - AUTH_ENABLED=false
+    volumes:
+      # Montar código para desarrollo (hot reload)
+      - ./app:/app/app
+      - ./requirements.txt:/app/requirements.txt
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Descomentar cuando se necesite base de datos
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: educalc-db
+  #   environment:
+  #     - POSTGRES_DB=educalc
+  #     - POSTGRES_USER=educalc
+  #     - POSTGRES_PASSWORD=educalc_password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:
+
+
+
+
