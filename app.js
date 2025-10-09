@@ -70,14 +70,54 @@ elements.exampleBtns.forEach(btn => {
 // Funciones principales
 // =============================================
 
+function cleanExpression(expr) {
+    // Limpiar y normalizar la expresión antes de enviarla al backend
+    let cleaned = expr.trim();
+    
+    // Remover símbolos matemáticos que no son válidos para SymPy
+    cleaned = cleaned.replace(/∫/g, '');  // Remover símbolo de integral
+    cleaned = cleaned.replace(/∂/g, 'd'); // Derivada parcial a 'd'
+    cleaned = cleaned.replace(/÷/g, '/'); // División
+    cleaned = cleaned.replace(/×/g, '*'); // Multiplicación
+    
+    // Remover espacios extras
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    // Si contiene "dx=" o "d/dx=" es probablemente un resultado, no entrada
+    if (cleaned.includes('dx=') || cleaned.includes('d/dx=')) {
+        // Extraer solo la parte de la expresión antes del =
+        const parts = cleaned.split('=');
+        if (parts.length > 1) {
+            // Buscar la expresión original (usualmente entre [] o después de dx)
+            const match = cleaned.match(/dx\[(.*?)\]/);
+            if (match) {
+                cleaned = match[1];
+            }
+        }
+    }
+    
+    // Si contiene "+ C" al final (resultado de integral), removerlo
+    cleaned = cleaned.replace(/\s*\+\s*C\s*$/i, '');
+    
+    return cleaned;
+}
+
 async function handleCalculate(e) {
     e.preventDefault();
     
-    const expression = elements.expressionInput.value.trim();
+    let expression = elements.expressionInput.value.trim();
     const mode = elements.modeSelect.value;
     
     if (!expression) {
         showError('Por favor, ingresa una expresión matemática');
+        return;
+    }
+    
+    // Limpiar y normalizar la expresión
+    expression = cleanExpression(expression);
+    
+    if (!expression) {
+        showError('La expresión no es válida después de limpiarla');
         return;
     }
     
@@ -139,7 +179,6 @@ function showResult(result) {
     
     // Llenar datos
     elements.originalExpression.textContent = result.original;
-    elements.finalResult.textContent = result.result;
     
     // Renderizar pasos
     renderSteps(result.steps);
@@ -150,10 +189,87 @@ function showResult(result) {
     elements.toggleStepsText.textContent = 'Ver pasos detallados';
     elements.toggleStepsIcon.textContent = '▼';
     
+    // Animar el resultado con conteo
+    animateResult(result.result);
+    
+    // Crear efecto de celebración
+    createCelebrationEffect();
+    
     // Scroll to result
     setTimeout(() => {
         elements.resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
+}
+
+function animateResult(finalValue) {
+    // Determinar longitud para ajustar tamaño
+    const length = finalValue.toString().length;
+    let sizeClass = 'short';
+    
+    if (length > 15) {
+        sizeClass = 'long';
+    } else if (length > 8) {
+        sizeClass = 'medium';
+    }
+    
+    elements.finalResult.setAttribute('data-length', sizeClass);
+    
+    // Intentar convertir a número para animar
+    const numValue = parseFloat(finalValue);
+    
+    if (!isNaN(numValue) && isFinite(numValue)) {
+        // Es un número, animar con conteo
+        const duration = 1000; // 1 segundo
+        const steps = 30;
+        const increment = numValue / steps;
+        let current = 0;
+        let step = 0;
+        
+        const interval = setInterval(() => {
+            step++;
+            current += increment;
+            
+            if (step >= steps) {
+                current = numValue;
+                clearInterval(interval);
+            }
+            
+            // Formatear el número (entero o decimal)
+            if (numValue === Math.floor(numValue)) {
+                elements.finalResult.textContent = Math.round(current);
+            } else {
+                elements.finalResult.textContent = current.toFixed(6).replace(/\.?0+$/, '');
+            }
+        }, duration / steps);
+    } else {
+        // No es un número simple, mostrar directamente
+        elements.finalResult.textContent = finalValue;
+    }
+}
+
+function createCelebrationEffect() {
+    // Agregar clase de celebración
+    elements.resultCard.classList.add('celebrating');
+    
+    // Crear partículas de celebración
+    const resultFinal = document.querySelector('.result-final');
+    
+    for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'celebration-particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 0.5 + 's';
+        particle.innerHTML = ['✨', '⭐', '🌟', '💫', '✓'][Math.floor(Math.random() * 5)];
+        resultFinal.appendChild(particle);
+        
+        // Eliminar después de la animación
+        setTimeout(() => particle.remove(), 2000);
+    }
+    
+    // Remover clase después de la animación
+    setTimeout(() => {
+        elements.resultCard.classList.remove('celebrating');
+    }, 2000);
 }
 
 function renderSteps(steps) {
