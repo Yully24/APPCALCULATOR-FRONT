@@ -3,7 +3,7 @@
 // =============================================
 
 // CONFIGURACIÓN - IMPORTANTE: Cambiar esta URL después de desplegar el backend
-const API_URL = 'https://appcalculator.onrender.com';
+const API_URL = 'https://educalc-backend-369988664819.us-central1.run.app/';
 //'http://localhost:8000'; // Cambiar a tu URL de Render después del deploy
 // Ejemplo: const API_URL = 'https://educalc-backend-xxxx.onrender.com';
 
