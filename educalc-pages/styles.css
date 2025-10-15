@@ -508,17 +508,31 @@ body {
 }
 
 .info-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow);
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    z-index: 1;
+}
+
+.info-card:hover {
+    transform: translateY(-6px);
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+    z-index: 2;
 }
 
 .info-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: var(--spacing-md);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: var(--spacing-lg);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Estilos para acordeón */
@@ -562,13 +576,19 @@ body {
 
 .info-list {
     list-style-position: inside;
-    color: var(--gray-700);
-    font-size: 0.95rem;
-    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 1rem;
+    line-height: 2;
 }
 
 .info-list li {
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.info-list strong {
+    color: white;
+    font-weight: 700;
 }
 
 /* === Footer === */
