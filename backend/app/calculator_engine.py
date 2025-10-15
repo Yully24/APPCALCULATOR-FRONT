@@ -124,40 +124,112 @@ class CalculatorEngine:
     
     def _arithmetic(self, expression: str) -> Dict[str, Any]:
         """
-        Resuelve operaciones aritméticas básicas
+        Resuelve operaciones aritméticas básicas con explicaciones educativas
         """
-        steps = []
-        
-        # Paso 1: Expresión original
-        steps.append(Step(
-            step=1,
-            description="Expresión original",
-            expression=expression,
-            detail="Evaluaremos esta expresión numérica paso a paso"
-        ))
-        
         try:
             # Parsear expresión
             expr = sympify(expression)
             
-            # Paso 2: Identificar operaciones
-            operations = self._identify_operations(expr)
-            if operations:
-                steps.append(Step(
-                    step=2,
-                    description="Identificar operaciones",
-                    expression=str(expr),
-                    detail=f"Operaciones presentes: {', '.join(operations)}"
-                ))
+            # SIEMPRE intentar primero con explicaciones educativas detalladas
+            # Si no funciona, usará el método compuesto automáticamente
+            return self._arithmetic_detailed(expression, expr)
+        
+        except Exception as e:
+            raise ValueError(f"Error en aritmética: {str(e)}")
+    
+    def _is_simple_operation(self, expr) -> bool:
+        """
+        Verifica si la expresión es una operación simple (dos números y un operador)
+        """
+        try:
+            # Verificar que la expresión tenga exactamente 2 argumentos
+            if not hasattr(expr, 'args') or len(expr.args) != 2:
+                return False
             
-            # Paso 3: Evaluar
-            result = expr.evalf()
-            result_formatted = format_number(result)
+            # Verificar que ambos argumentos sean números puros
+            arg1, arg2 = expr.args
+            if not (arg1.is_number and arg2.is_number):
+                return False
+            
+            # Verificar que sea una operación básica (Add, Mul, Pow)
+            if not isinstance(expr, (Add, Mul, Pow)):
+                return False
+            
+            return True
+        except:
+            return False
+    
+    def _arithmetic_detailed(self, expression: str, expr) -> Dict[str, Any]:
+        """
+        Explicación educativa detallada para operaciones simples
+        """
+        try:
+            # Detectar el tipo de operación
+            op_type, nums = self._detect_operation_type(expr, expression)
+            
+            # Validar que tengamos 2 números
+            if op_type != "unknown" and len(nums) == 2:
+                if op_type == "division":
+                    return self._explain_division(nums[0], nums[1])
+                elif op_type == "multiplication":
+                    return self._explain_multiplication(nums[0], nums[1])
+                elif op_type == "addition":
+                    return self._explain_addition(nums[0], nums[1])
+                elif op_type == "subtraction":
+                    return self._explain_subtraction(nums[0], nums[1])
+                elif op_type == "power":
+                    return self._explain_power(nums[0], nums[1])
+            
+            # Si no se puede identificar o no es una operación simple válida, usar método compuesto
+            return self._arithmetic_compound(expression, expr)
+        except Exception as e:
+            # Si hay cualquier error, usar el método compuesto
+            return self._arithmetic_compound(expression, expr)
+    
+    def _arithmetic_compound(self, expression: str, expr) -> Dict[str, Any]:
+        """
+        Explicación para operaciones compuestas (múltiples operadores)
+        """
+        steps = []
+        
+        try:
+            # Paso 1: Expresión original con introducción
+            steps.append(Step(
+                step=1,
+                description="💡 Expresión original",
+                expression=expression,
+                detail="Vamos a resolver esta expresión matemática paso a paso, siguiendo el orden correcto de operaciones."
+            ))
+            
+            # Paso 2: Explicar PEMDAS y mostrar operaciones
+            operations = self._identify_operations(expr)
+            operations_text = f"Operaciones presentes: {', '.join(operations)}" if operations else "Operaciones básicas"
+            
+            steps.append(Step(
+                step=2,
+                description="📋 Identificar operaciones y orden",
+                expression=str(expr),
+                detail=f"{operations_text}\n\nRecuerda el orden PEMDAS:\n• Paréntesis\n• Exponentes\n• Multiplicación/División (izquierda a derecha)\n• Suma/Resta (izquierda a derecha)\n\nPrimero resolvemos multiplicación/división, luego suma/resta."
+            ))
+            
+            # Paso 3: Mostrar el proceso
             steps.append(Step(
                 step=len(steps) + 1,
-                description="Evaluar expresión",
+                description="✏️ Resolver paso a paso",
+                expression=expression,
+                detail=f"Seguimos el orden PEMDAS:\n\n1️⃣ Primero: Multiplicación/División\n2️⃣ Después: Suma/Resta\n\nVamos a resolver cada operación en el orden correcto."
+            ))
+            
+            # Paso 4: Evaluar y mostrar resultado
+            result = expr.evalf()
+            result_formatted = format_number(result)
+            
+            # Paso 4: Resultado final
+            steps.append(Step(
+                step=len(steps) + 1,
+                description="✅ Resultado final",
                 expression=result_formatted,
-                detail="Realizar los cálculos siguiendo el orden de operaciones (PEMDAS)"
+                detail=f"🎉 La respuesta es {result_formatted}"
             ))
             
             return {
@@ -165,56 +237,553 @@ class CalculatorEngine:
                 "steps": [s.model_dump() for s in steps],
                 "mode": "arithmetic"
             }
-        
         except Exception as e:
-            raise ValueError(f"Error en aritmética: {str(e)}")
+            # Si hay un error, devolver una respuesta básica
+            try:
+                result = expr.evalf()
+                result_formatted = format_number(result)
+            except:
+                result_formatted = str(expr)
+            
+            return {
+                "result": result_formatted,
+                "steps": [
+                    Step(
+                        step=1,
+                        description="Expresión",
+                        expression=expression,
+                        detail="Calculando resultado..."
+                    ).model_dump(),
+                    Step(
+                        step=2,
+                        description="Resultado",
+                        expression=result_formatted,
+                        detail=f"El resultado es: {result_formatted}"
+                    ).model_dump()
+                ],
+                "mode": "arithmetic"
+            }
     
-    def _algebra(self, expression: str) -> Dict[str, Any]:
+    def _detect_operation_type(self, expr, expression: str):
         """
-        Simplifica y expande expresiones algebraicas
+        Detecta el tipo de operación y extrae los números
+        Solo detecta operaciones SIMPLES (dos números y un operador)
+        """
+        # Limpiar espacios
+        expr_clean = expression.strip()
+        
+        # Intentar detectar división SIMPLE (sin otros operadores)
+        if "/" in expr_clean and "*" not in expr_clean and "+" not in expr_clean and "-" not in expr_clean.replace(" ", ""):
+            parts = expr_clean.split("/")
+            if len(parts) == 2:
+                try:
+                    p1 = parts[0].strip()
+                    p2 = parts[1].strip()
+                    # Verificar que sean números puros (sin operadores)
+                    if p1.replace(".", "").replace("-", "").isdigit() and p2.replace(".", "").replace("-", "").isdigit():
+                        num1 = float(p1)
+                        num2 = float(p2)
+                        return "division", [num1, num2]
+                except:
+                    pass
+        
+        # Detectar multiplicación SIMPLE (sin ** ni otros operadores)
+        if "*" in expr_clean and "**" not in expr_clean and "/" not in expr_clean and "+" not in expr_clean:
+            # Remover espacios para contar -
+            temp = expr_clean.replace(" ", "")
+            if temp.count("-") <= 1 and (temp.count("-") == 0 or temp.startswith("-") or temp.find("*-") > 0):
+                parts = expr_clean.split("*")
+                if len(parts) == 2:
+                    try:
+                        p1 = parts[0].strip()
+                        p2 = parts[1].strip()
+                        if p1.replace(".", "").replace("-", "").isdigit() and p2.replace(".", "").replace("-", "").isdigit():
+                            num1 = float(p1)
+                            num2 = float(p2)
+                            return "multiplication", [num1, num2]
+                    except:
+                        pass
+        
+        # Detectar potencia SIMPLE
+        if "**" in expr_clean and "/" not in expr_clean and "+" not in expr_clean:
+            temp = expr_clean.replace(" ", "")
+            if temp.count("-") <= 1:
+                parts = expr_clean.split("**")
+                if len(parts) == 2:
+                    try:
+                        p1 = parts[0].strip()
+                        p2 = parts[1].strip()
+                        if p1.replace(".", "").replace("-", "").isdigit() and p2.replace(".", "").replace("-", "").isdigit():
+                            num1 = float(p1)
+                            num2 = float(p2)
+                            return "power", [num1, num2]
+                    except:
+                        pass
+        
+        # Detectar suma SIMPLE (sin paréntesis ni otros operadores)
+        if "+" in expr_clean and "(" not in expr_clean and "*" not in expr_clean and "/" not in expr_clean:
+            parts = expr_clean.split("+")
+            if len(parts) == 2:
+                try:
+                    p1 = parts[0].strip()
+                    p2 = parts[1].strip()
+                    if p1.replace(".", "").replace("-", "").isdigit() and p2.replace(".", "").replace("-", "").isdigit():
+                        num1 = float(p1)
+                        num2 = float(p2)
+                        return "addition", [num1, num2]
+                except:
+                    pass
+        
+        # Detectar resta SIMPLE
+        if "-" in expr_clean and "(" not in expr_clean and "*" not in expr_clean and "/" not in expr_clean and "+" not in expr_clean:
+            # Buscar el último - (para manejar números negativos)
+            idx = expr_clean.rfind("-")
+            if idx > 0:  # No al inicio
+                try:
+                    p1 = expr_clean[:idx].strip()
+                    p2 = expr_clean[idx+1:].strip()
+                    if p1.replace(".", "").replace("-", "").isdigit() and p2.replace(".", "").replace("-", "").isdigit():
+                        num1 = float(p1)
+                        num2 = float(p2)
+                        return "subtraction", [num1, num2]
+                except:
+                    pass
+        
+        return "unknown", []
+    
+    def _explain_division(self, dividend: float, divisor: float) -> Dict[str, Any]:
+        """
+        Explicación educativa detallada para división
         """
         steps = []
         
-        # Paso 1: Expresión original
+        # Convertir a enteros si es posible
+        dividend_int = int(dividend) if dividend == int(dividend) else dividend
+        divisor_int = int(divisor) if divisor == int(divisor) else divisor
+        
+        # Paso 1: Introducción conceptual
         steps.append(Step(
             step=1,
-            description="Expresión original",
+            description="💡 ¿Qué significa dividir?",
+            expression=f"{dividend_int} ÷ {divisor_int}",
+            detail="Dividir es repartir en partes iguales.\n\nPor ejemplo:\nSi tienes {} {} y los quieres repartir entre {} {}, la división te dice cuánto le toca a cada uno.".format(
+                dividend_int,
+                "caramelos" if dividend_int != 1 else "caramelo",
+                divisor_int,
+                "amigos" if divisor_int != 1 else "amigo"
+            )
+        ))
+        
+        # Paso 2: Plantear la pregunta
+        steps.append(Step(
+            step=2,
+            description="✏️ ¿Qué es {} ÷ {}?".format(dividend_int, divisor_int),
+            expression=f"{dividend_int} ÷ {divisor_int}",
+            detail="Eso quiere decir:\n¿Cuántas veces cabe el {} en el {}?\nO: ¿Cuánto le toca a cada uno si repartimos {} entre {} {}?".format(
+                divisor_int,
+                dividend_int,
+                dividend_int,
+                divisor_int,
+                "personas" if divisor_int > 1 else "persona"
+            )
+        ))
+        
+        # Calcular resultado
+        result = dividend / divisor
+        result_int = int(result) if result == int(result) else result
+        remainder = dividend % divisor if dividend == int(dividend) and divisor == int(divisor) else 0
+        
+        # Paso 3: Proceso de división
+        if dividend_int == int(dividend_int) and divisor_int == int(divisor_int) and dividend_int >= 100:
+            # División larga para números grandes
+            steps.extend(self._explain_long_division(int(dividend_int), int(divisor_int)))
+        else:
+            # División simple
+            steps.append(Step(
+                step=3,
+                description="🔢 Resolver la división",
+                expression=f"{dividend_int} ÷ {divisor_int} = {result_int}",
+                detail="Para resolver esta división, pensamos:\n¿Cuántas veces cabe el {} en {}?\n👉 Cabe {} veces{}".format(
+                    divisor_int,
+                    dividend_int,
+                    result_int,
+                    f", porque {divisor_int} × {result_int} = {dividend_int}" if remainder == 0 else f" y sobra {int(remainder)}"
+                )
+            ))
+        
+        # Paso 4: Verificación
+        if remainder == 0:
+            steps.append(Step(
+                step=len(steps) + 1,
+                description="✓ Verificar el resultado",
+                expression=f"{divisor_int} × {result_int} = {dividend_int}",
+                detail="Podemos verificar multiplicando: {} × {} = {}. ¡Correcto! ✓".format(
+                    divisor_int,
+                    result_int,
+                    dividend_int
+                )
+            ))
+        
+        # Paso final: Resultado con contexto
+        steps.append(Step(
+            step=len(steps) + 1,
+            description="✅ Resultado final",
+            expression=f"{dividend_int} ÷ {divisor_int} = {result_int}",
+            detail="🎉 Entonces, {} ÷ {} = {}\n\n{}".format(
+                dividend_int,
+                divisor_int,
+                result_int,
+                "Cada uno recibe {} {} si los repartimos en partes iguales.".format(
+                    result_int,
+                    "caramelos" if result_int != 1 else "caramelo"
+                ) if remainder == 0 else "El resultado es {} con un residuo de {}.".format(result_int, int(remainder))
+            )
+        ))
+        
+        return {
+            "result": format_number(result),
+            "steps": [s.model_dump() for s in steps],
+            "mode": "arithmetic"
+        }
+    
+    def _explain_long_division(self, dividend: int, divisor: int) -> List[Step]:
+        """
+        Genera pasos detallados para división larga
+        """
+        steps = []
+        dividend_str = str(dividend)
+        quotient = ""
+        current = 0
+        position = 0
+        
+        steps.append(Step(
+            step=3,
+            description="✅ Paso a paso con división larga",
+            expression=f"{dividend} ÷ {divisor}",
+            detail="Vamos a dividir usando una técnica fácil llamada división larga."
+        ))
+        
+        step_details = []
+        
+        for i, digit in enumerate(dividend_str):
+            current = current * 10 + int(digit)
+            position = i + 1
+            
+            if current >= divisor:
+                # Cuántas veces cabe
+                times = current // divisor
+                quotient += str(times)
+                remainder = current % divisor
+                
+                place_name = ""
+                if len(dividend_str) - i == 3:
+                    place_name = " (centenas)"
+                elif len(dividend_str) - i == 2:
+                    place_name = " (decenas)"
+                elif len(dividend_str) - i == 1:
+                    place_name = " (unidades)"
+                
+                detail = "Paso {}: Miramos el {}{}.\n¿Cuántas veces cabe el {} en {}?\n👉 Cabe {} {}, porque {} × {} = {}\nSobra: {} - {} = {}".format(
+                    position,
+                    current if i == 0 else dividend_str[:i+1],
+                    place_name,
+                    divisor,
+                    current,
+                    times,
+                    "vez" if times == 1 else "veces",
+                    divisor,
+                    times,
+                    divisor * times,
+                    current,
+                    divisor * times,
+                    remainder
+                )
+                
+                step_details.append(detail)
+                current = remainder
+            elif quotient:  # Ya empezamos el cociente
+                quotient += "0"
+                step_details.append(f"Paso {position}: Bajamos el {digit}. Ahora tenemos {current}.\n¿Cuántas veces cabe el {divisor} en {current}?\n👉 Cabe 0 veces")
+        
+        # Agregar todos los pasos de división larga
+        all_details = "\n\n".join(step_details)
+        steps.append(Step(
+            step=4,
+            description="🔢 Proceso detallado",
+            expression=quotient,
+            detail=all_details
+        ))
+        
+        return steps
+    
+    def _explain_multiplication(self, num1: float, num2: float) -> Dict[str, Any]:
+        """
+        Explicación educativa para multiplicación
+        """
+        steps = []
+        
+        num1_int = int(num1) if num1 == int(num1) else num1
+        num2_int = int(num2) if num2 == int(num2) else num2
+        result = num1 * num2
+        result_int = int(result) if result == int(result) else result
+        
+        # Introducción
+        steps.append(Step(
+            step=1,
+            description="💡 ¿Qué significa multiplicar?",
+            expression=f"{num1_int} × {num2_int}",
+            detail="Multiplicar es sumar un número varias veces.\n\nPor ejemplo:\n{} × {} significa sumar {} veces el número {}.".format(
+                num1_int, num2_int, num2_int, num1_int
+            )
+        ))
+        
+        # Explicación visual (si los números son pequeños)
+        if num1_int <= 12 and num2_int <= 12:
+            sum_representation = " + ".join([str(num1_int)] * int(num2_int)) if num2_int <= 5 else f"{num1_int} (sumado {num2_int} veces)"
+            steps.append(Step(
+                step=2,
+                description="✏️ Representar como suma",
+                expression=sum_representation if num2_int <= 5 else f"{num1_int} × {num2_int}",
+                detail="Podemos pensar en esto como:\n{} = {}".format(
+                    sum_representation if num2_int <= 5 else f"{num1_int} + {num1_int} + ... ({num2_int} veces)",
+                    result_int
+                )
+            ))
+        
+        # Resultado
+        steps.append(Step(
+            step=len(steps) + 1,
+            description="🔢 Calcular el producto",
+            expression=f"{num1_int} × {num2_int} = {result_int}",
+            detail="Multiplicamos: {} × {} = {}".format(num1_int, num2_int, result_int)
+        ))
+        
+        # Resultado final
+        steps.append(Step(
+            step=len(steps) + 1,
+            description="✅ Resultado final",
+            expression=str(result_int),
+            detail="🎉 Entonces, {} × {} = {}\n\nSi tienes {} grupos de {} elementos, en total tienes {} elementos.".format(
+                num1_int, num2_int, result_int, num2_int, num1_int, result_int
+            )
+        ))
+        
+        return {
+            "result": format_number(result),
+            "steps": [s.model_dump() for s in steps],
+            "mode": "arithmetic"
+        }
+    
+    def _explain_addition(self, num1: float, num2: float) -> Dict[str, Any]:
+        """
+        Explicación educativa para suma
+        """
+        steps = []
+        
+        num1_int = int(num1) if num1 == int(num1) else num1
+        num2_int = int(num2) if num2 == int(num2) else num2
+        result = num1 + num2
+        result_int = int(result) if result == int(result) else result
+        
+        # Introducción
+        steps.append(Step(
+            step=1,
+            description="💡 ¿Qué significa sumar?",
+            expression=f"{num1_int} + {num2_int}",
+            detail="Sumar es juntar o combinar cantidades.\n\nPor ejemplo:\nSi tienes {} manzanas y consigues {} más, ¿cuántas manzanas tienes en total?".format(
+                num1_int, num2_int
+            )
+        ))
+        
+        # Proceso
+        steps.append(Step(
+            step=2,
+            description="✏️ Sumar los números",
+            expression=f"{num1_int} + {num2_int} = {result_int}",
+            detail="Juntamos las dos cantidades:\n{} + {} = {}".format(num1_int, num2_int, result_int)
+        ))
+        
+        # Resultado final
+        steps.append(Step(
+            step=3,
+            description="✅ Resultado final",
+            expression=str(result_int),
+            detail="🎉 Entonces, {} + {} = {}\n\nEn total tienes {} elementos.".format(
+                num1_int, num2_int, result_int, result_int
+            )
+        ))
+        
+        return {
+            "result": format_number(result),
+            "steps": [s.model_dump() for s in steps],
+            "mode": "arithmetic"
+        }
+    
+    def _explain_subtraction(self, num1: float, num2: float) -> Dict[str, Any]:
+        """
+        Explicación educativa para resta
+        """
+        steps = []
+        
+        num1_int = int(num1) if num1 == int(num1) else num1
+        num2_int = int(num2) if num2 == int(num2) else num2
+        result = num1 - num2
+        result_int = int(result) if result == int(result) else result
+        
+        # Introducción
+        steps.append(Step(
+            step=1,
+            description="💡 ¿Qué significa restar?",
+            expression=f"{num1_int} - {num2_int}",
+            detail="Restar es quitar o encontrar la diferencia entre dos cantidades.\n\nPor ejemplo:\nSi tienes {} galletas y comes {}, ¿cuántas galletas te quedan?".format(
+                num1_int, num2_int
+            )
+        ))
+        
+        # Proceso
+        steps.append(Step(
+            step=2,
+            description="✏️ Restar los números",
+            expression=f"{num1_int} - {num2_int} = {result_int}",
+            detail="Quitamos la segunda cantidad de la primera:\n{} - {} = {}".format(num1_int, num2_int, result_int)
+        ))
+        
+        # Resultado final
+        steps.append(Step(
+            step=3,
+            description="✅ Resultado final",
+            expression=str(result_int),
+            detail="🎉 Entonces, {} - {} = {}\n\n{}".format(
+                num1_int, num2_int, result_int,
+                f"Te quedan {result_int} elementos." if result_int >= 0 else f"El resultado es negativo: {result_int}"
+            )
+        ))
+        
+        return {
+            "result": format_number(result),
+            "steps": [s.model_dump() for s in steps],
+            "mode": "arithmetic"
+        }
+    
+    def _explain_power(self, base: float, exponent: float) -> Dict[str, Any]:
+        """
+        Explicación educativa para potencias
+        """
+        steps = []
+        
+        base_int = int(base) if base == int(base) else base
+        exp_int = int(exponent) if exponent == int(exponent) else exponent
+        result = base ** exponent
+        result_int = int(result) if result == int(result) else result
+        
+        # Introducción
+        steps.append(Step(
+            step=1,
+            description="💡 ¿Qué significa una potencia?",
+            expression=f"{base_int}^{exp_int}",
+            detail="Una potencia significa multiplicar un número por sí mismo varias veces.\n\n{}^{} significa multiplicar {} por sí mismo {} veces.".format(
+                base_int, exp_int, base_int, exp_int
+            )
+        ))
+        
+        # Explicación visual (si el exponente es pequeño)
+        if exp_int <= 5 and exp_int == int(exp_int) and exp_int > 0:
+            mult_representation = " × ".join([str(base_int)] * int(exp_int))
+            steps.append(Step(
+                step=2,
+                description="✏️ Representar como multiplicación",
+                expression=mult_representation,
+                detail="Podemos escribir esto como:\n{}^{} = {}".format(
+                    base_int, exp_int, mult_representation
+                )
+            ))
+        
+        # Resultado
+        steps.append(Step(
+            step=len(steps) + 1,
+            description="🔢 Calcular la potencia",
+            expression=f"{base_int}^{exp_int} = {result_int}",
+            detail="Calculamos: {}^{} = {}".format(base_int, exp_int, result_int)
+        ))
+        
+        # Resultado final
+        steps.append(Step(
+            step=len(steps) + 1,
+            description="✅ Resultado final",
+            expression=str(result_int),
+            detail="🎉 Entonces, {}^{} = {}".format(base_int, exp_int, result_int)
+        ))
+        
+        return {
+            "result": format_number(result),
+            "steps": [s.model_dump() for s in steps],
+            "mode": "arithmetic"
+        }
+    
+    def _algebra(self, expression: str) -> Dict[str, Any]:
+        """
+        Simplifica y expande expresiones algebraicas con explicaciones educativas
+        """
+        steps = []
+        
+        # Paso 1: Introducción a álgebra
+        steps.append(Step(
+            step=1,
+            description="💡 ¿Qué es una expresión algebraica?",
             expression=expression,
-            detail="Simplificaremos esta expresión algebraica"
+            detail="Una expresión algebraica usa letras (variables) para representar números desconocidos.\n\nPor ejemplo: En '2x + 3', la 'x' puede valer cualquier número.\n\nVamos a simplificar esta expresión paso a paso."
         ))
         
         try:
             expr = sympify(expression)
             
-            # Paso 2: Expandir
+            # Identificar variables
+            variables = list(expr.free_symbols)
+            if variables:
+                var_names = ", ".join(str(v) for v in variables)
+                steps.append(Step(
+                    step=2,
+                    description="📝 Identificar variables",
+                    expression=expression,
+                    detail=f"Las variables en esta expresión son: {var_names}\n\nEstas letras representan números que aún no conocemos."
+                ))
+            
+            # Paso: Expandir
             expanded = expand(expr)
             if expanded != expr:
                 steps.append(Step(
-                    step=2,
-                    description="Expandir expresión",
+                    step=len(steps) + 1,
+                    description="✏️ Expandir expresión",
                     expression=str(expanded),
-                    detail="Aplicar propiedad distributiva y expandir productos"
+                    detail="Aplicamos la propiedad distributiva:\na(b + c) = ab + ac\n\nMultiplicamos cada término dentro de los paréntesis."
                 ))
                 expr = expanded
             
-            # Paso 3: Simplificar
+            # Paso: Simplificar
             simplified = simplify(expr)
             if simplified != expr:
                 steps.append(Step(
                     step=len(steps) + 1,
-                    description="Simplificar",
+                    description="🔢 Simplificar y combinar términos",
                     expression=str(simplified),
-                    detail="Combinar términos semejantes y simplificar"
+                    detail="Combinamos los términos semejantes (términos con las mismas variables y exponentes).\n\nPor ejemplo: 2x + 3x = 5x"
                 ))
                 expr = simplified
             
             # Paso final: Resultado
-            if len(steps) == 1:
+            if len(steps) <= 2:
                 steps.append(Step(
-                    step=2,
-                    description="Expresión ya simplificada",
+                    step=len(steps) + 1,
+                    description="✅ Expresión simplificada",
                     expression=str(expr),
-                    detail="La expresión no requiere más simplificación"
+                    detail="Esta expresión ya está en su forma más simple. No necesita más simplificación."
+                ))
+            else:
+                steps.append(Step(
+                    step=len(steps) + 1,
+                    description="✅ Resultado final",
+                    expression=str(expr),
+                    detail=f"🎉 La expresión simplificada es: {expr}\n\nEsta es la forma más sencilla de escribir la expresión original."
                 ))
             
             return {
@@ -228,16 +797,16 @@ class CalculatorEngine:
     
     def _solve_equation(self, expression: str) -> Dict[str, Any]:
         """
-        Resuelve ecuaciones lineales y cuadráticas
+        Resuelve ecuaciones con explicaciones educativas detalladas
         """
         steps = []
         
-        # Paso 1: Expresión original
+        # Paso 1: Introducción a ecuaciones
         steps.append(Step(
             step=1,
-            description="Ecuación original",
+            description="💡 ¿Qué es una ecuación?",
             expression=expression,
-            detail="Resolveremos esta ecuación para encontrar el valor de la variable"
+            detail="Una ecuación es como una balanza en equilibrio.\n\nEl signo '=' dice que ambos lados valen lo mismo.\n\nNuestra meta es encontrar el valor de la incógnita (variable) que hace que la ecuación sea verdadera."
         ))
         
         try:
@@ -253,9 +822,9 @@ class CalculatorEngine:
             equation = Eq(left_expr, right_expr)
             steps.append(Step(
                 step=2,
-                description="Expresar como ecuación",
+                description="📋 Los dos lados de la ecuación",
                 expression=f"{left_expr} = {right_expr}",
-                detail="Identificar los lados de la ecuación"
+                detail=f"Lado izquierdo: {left_expr}\nLado derecho: {right_expr}\n\nAmbos lados deben ser iguales."
             ))
             
             # Paso 3: Identificar variable
@@ -266,32 +835,50 @@ class CalculatorEngine:
             var = list(free_vars)[0]  # Tomar la primera variable
             steps.append(Step(
                 step=3,
-                description=f"Variable a resolver: {var}",
+                description=f"🔍 Identificar la incógnita",
                 expression=str(equation),
-                detail=f"Resolveremos para la variable '{var}'"
+                detail=f"La variable que debemos encontrar es '{var}'.\n\nVamos a despejar '{var}' para encontrar su valor."
             ))
             
-            # Paso 4: Resolver
+            # Paso 4: Proceso de resolución
+            steps.append(Step(
+                step=4,
+                description="✏️ Resolver la ecuación",
+                expression=str(equation),
+                detail="Para resolver, aplicamos operaciones a ambos lados de la ecuación:\n\n• Si sumamos/restamos algo, lo hacemos en ambos lados\n• Si multiplicamos/dividimos, lo hacemos en ambos lados\n• Así mantenemos el equilibrio de la balanza"
+            ))
+            
+            # Paso 5: Resolver
             solutions = solve(equation, var)
             
-            # Paso 5: Presentar solución
+            # Paso 6: Presentar solución
             if not solutions:
                 result_str = "Sin solución"
-                detail = "La ecuación no tiene soluciones reales"
+                detail = "❌ Esta ecuación no tiene soluciones reales.\n\nEsto significa que no existe ningún valor de {} que haga verdadera la ecuación.".format(var)
             elif len(solutions) == 1:
                 sol_formatted = format_number(solutions[0])
                 result_str = f"{var} = {sol_formatted}"
-                detail = f"La solución única es {var} = {sol_formatted}"
+                
+                # Verificar la solución
+                verification = left_expr.subs(var, solutions[0])
+                steps.append(Step(
+                    step=5,
+                    description="✓ Verificar la solución",
+                    expression=f"{var} = {sol_formatted}",
+                    detail=f"Vamos a comprobar que la solución es correcta.\n\nSustituimos {var} = {sol_formatted} en la ecuación original:\n{left_expr.subs(var, solutions[0])} = {right_expr}\n\n¡Es correcto! ✓"
+                ))
+                
+                detail = f"La solución es {var} = {sol_formatted}"
             else:
                 sols_formatted = [format_number(s) for s in solutions]
                 result_str = f"{var} = {{{', '.join(sols_formatted)}}}"
-                detail = f"Las soluciones son: {', '.join(sols_formatted)}"
+                detail = f"Esta ecuación tiene múltiples soluciones:\n{var} = {' o '.join(sols_formatted)}\n\nCualquiera de estos valores hace verdadera la ecuación."
             
             steps.append(Step(
-                step=4,
-                description="Solución",
+                step=len(steps) + 1,
+                description="✅ Resultado final",
                 expression=result_str,
-                detail=detail
+                detail=f"🎉 {detail}"
             ))
             
             return {
@@ -305,16 +892,16 @@ class CalculatorEngine:
     
     def _derivative(self, expression: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        Calcula derivadas
+        Calcula derivadas con explicaciones educativas
         """
         steps = []
         
-        # Paso 1: Expresión original
+        # Paso 1: Introducción a derivadas
         steps.append(Step(
             step=1,
-            description="Función original",
+            description="💡 ¿Qué es una derivada?",
             expression=expression,
-            detail="Calcularemos la derivada de esta función"
+            detail="La derivada nos dice qué tan rápido cambia algo.\n\nPor ejemplo:\n• La velocidad es la derivada de la posición (qué tan rápido cambia tu ubicación)\n• La aceleración es la derivada de la velocidad\n\nVamos a calcular la derivada de esta función."
         ))
         
         try:
@@ -329,17 +916,26 @@ class CalculatorEngine:
             
             steps.append(Step(
                 step=2,
-                description=f"Variable de derivación: {var}",
+                description=f"📝 Variable de derivación",
                 expression=str(expr),
-                detail=f"Derivaremos con respecto a '{var}'"
+                detail=f"Vamos a derivar con respecto a '{var}'.\n\nEsto significa que veremos cómo cambia la función cuando {var} cambia."
+            ))
+            
+            # Identificar el tipo de función
+            func_type = self._identify_function_type(expr, var)
+            steps.append(Step(
+                step=3,
+                description="🔍 Identificar tipo de función",
+                expression=str(expr),
+                detail=func_type
             ))
             
             # Calcular derivada
             derivative = diff(expr, var)
             
             steps.append(Step(
-                step=3,
-                description="Aplicar reglas de derivación",
+                step=4,
+                description="✏️ Aplicar reglas de derivación",
                 expression=str(derivative),
                 detail=self._explain_derivative_rule(expr, var)
             ))
@@ -348,12 +944,20 @@ class CalculatorEngine:
             simplified = simplify(derivative)
             if simplified != derivative:
                 steps.append(Step(
-                    step=4,
-                    description="Simplificar resultado",
+                    step=5,
+                    description="🔢 Simplificar",
                     expression=str(simplified),
-                    detail="Simplificar la expresión derivada"
+                    detail="Simplificamos la expresión para obtener la forma más clara."
                 ))
                 derivative = simplified
+            
+            # Resultado final
+            steps.append(Step(
+                step=len(steps) + 1,
+                description="✅ Resultado final",
+                expression=f"d/d{var}[{expr}] = {derivative}",
+                detail=f"🎉 La derivada es: {derivative}\n\nEsta función nos dice la tasa de cambio instantánea."
+            ))
             
             return {
                 "result": f"d/d{var}[{expr}] = {derivative}",
@@ -366,16 +970,16 @@ class CalculatorEngine:
     
     def _integral(self, expression: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        Calcula integrales indefinidas
+        Calcula integrales con explicaciones educativas
         """
         steps = []
         
-        # Paso 1: Expresión original
+        # Paso 1: Introducción a integrales
         steps.append(Step(
             step=1,
-            description="Función a integrar",
+            description="💡 ¿Qué es una integral?",
             expression=expression,
-            detail="Calcularemos la integral indefinida de esta función"
+            detail="La integral es lo opuesto de la derivada.\n\nPodemos pensar en ella como:\n• Encontrar el área bajo una curva\n• Sumar infinitos pedacitos pequeños\n• Revertir el proceso de derivación\n\nVamos a calcular la integral de esta función."
         ))
         
         try:
@@ -390,28 +994,45 @@ class CalculatorEngine:
             
             steps.append(Step(
                 step=2,
-                description=f"Variable de integración: {var}",
+                description=f"📝 Variable de integración",
                 expression=str(expr),
-                detail=f"Integraremos con respecto a '{var}'"
+                detail=f"Vamos a integrar con respecto a '{var}'.\n\nEsto significa que estamos 'sumando' o 'acumulando' valores a medida que {var} cambia."
+            ))
+            
+            # Identificar el tipo de función
+            func_type = self._identify_function_type(expr, var)
+            steps.append(Step(
+                step=3,
+                description="🔍 Identificar tipo de función",
+                expression=str(expr),
+                detail=func_type
             ))
             
             # Calcular integral
             integral_result = integrate(expr, var)
             
             steps.append(Step(
-                step=3,
-                description="Aplicar reglas de integración",
+                step=4,
+                description="✏️ Aplicar reglas de integración",
                 expression=str(integral_result),
-                detail="Aplicar las reglas de integración apropiadas"
+                detail=self._explain_integration_rule(expr, var)
             ))
             
             # Añadir constante
             result_str = f"{integral_result} + C"
             steps.append(Step(
-                step=4,
-                description="Añadir constante de integración",
+                step=5,
+                description="➕ Añadir constante",
                 expression=result_str,
-                detail="Las integrales indefinidas incluyen una constante arbitraria C"
+                detail="Añadimos '+ C' (constante de integración).\n\n¿Por qué?\nCuando derivamos una constante, se vuelve 0. Por eso, al integrar, no sabemos si había una constante originalmente.\n\nLa 'C' puede ser cualquier número."
+            ))
+            
+            # Resultado final
+            steps.append(Step(
+                step=6,
+                description="✅ Resultado final",
+                expression=f"∫{expr} d{var} = {result_str}",
+                detail=f"🎉 La integral es: {result_str}\n\nEsta función representa la 'antiderivada' o la acumulación de la función original."
             ))
             
             return {
@@ -439,16 +1060,62 @@ class CalculatorEngine:
         
         return list(operations)
     
+    def _identify_function_type(self, expr, var) -> str:
+        """
+        Identifica el tipo de función para dar contexto educativo
+        """
+        from sympy import sin, cos, tan, exp, log
+        
+        if expr.is_polynomial(var):
+            degree = expr.as_poly(var).degree() if expr.as_poly(var) else 0
+            if degree == 1:
+                return "Esta es una función lineal (una línea recta)."
+            elif degree == 2:
+                return "Esta es una función cuadrática (una parábola)."
+            else:
+                return f"Esta es una función polinomial de grado {degree}."
+        elif expr.has(sin, cos, tan):
+            return "Esta es una función trigonométrica (relacionada con ángulos y círculos)."
+        elif expr.has(exp):
+            return "Esta es una función exponencial (crece muy rápidamente)."
+        elif expr.has(log):
+            return "Esta es una función logarítmica (lo opuesto de la exponencial)."
+        else:
+            return "Vamos a trabajar con esta función matemática."
+    
     def _explain_derivative_rule(self, expr, var) -> str:
         """
         Genera explicación de la regla de derivación aplicada
         """
+        from sympy import sin, cos, tan, exp, log
+        
         if expr.is_polynomial(var):
-            return "Aplicar regla de la potencia: d/dx[x^n] = n*x^(n-1)"
-        elif expr.has(sympify('sin'), sympify('cos'), sympify('tan')):
-            return "Aplicar reglas de derivación trigonométricas"
+            return "Aplicamos la regla de la potencia:\n\nd/dx[x^n] = n × x^(n-1)\n\nBajamos el exponente y restamos 1 al exponente.\n\nPor ejemplo: d/dx[x³] = 3x²"
+        elif expr.has(sin):
+            return "Reglas trigonométricas:\n• d/dx[sin(x)] = cos(x)\n• d/dx[cos(x)] = -sin(x)\n• d/dx[tan(x)] = sec²(x)"
+        elif expr.has(exp):
+            return "Regla de la exponencial:\nd/dx[e^x] = e^x\n\nLa exponencial es especial: ¡su derivada es ella misma!"
+        elif expr.has(log):
+            return "Regla del logaritmo:\nd/dx[ln(x)] = 1/x"
         else:
-            return "Aplicar reglas de derivación correspondientes"
+            return "Aplicamos las reglas de derivación correspondientes, como:\n• Regla del producto\n• Regla de la cadena\n• Regla del cociente"
+    
+    def _explain_integration_rule(self, expr, var) -> str:
+        """
+        Genera explicación de la regla de integración aplicada
+        """
+        from sympy import sin, cos, tan, exp, log
+        
+        if expr.is_polynomial(var):
+            return "Aplicamos la regla de la potencia para integración:\n\n∫x^n dx = x^(n+1)/(n+1) + C\n\nSumamos 1 al exponente y dividimos por el nuevo exponente.\n\nPor ejemplo: ∫x² dx = x³/3 + C"
+        elif expr.has(sin, cos):
+            return "Reglas trigonométricas de integración:\n• ∫sin(x) dx = -cos(x) + C\n• ∫cos(x) dx = sin(x) + C"
+        elif expr.has(exp):
+            return "Regla de la exponencial:\n∫e^x dx = e^x + C\n\nLa integral de e^x es e^x."
+        elif str(expr) == "1/x" or expr.has(log):
+            return "Regla especial:\n∫(1/x) dx = ln|x| + C"
+        else:
+            return "Aplicamos las reglas de integración correspondientes."
     
     def validate_expression(self, expression: str, mode: str = "auto") -> bool:
         """

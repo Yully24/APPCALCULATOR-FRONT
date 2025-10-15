@@ -42,6 +42,29 @@ def sanitize_expression(expression: str) -> str:
     # Eliminar espacios extra
     expression = expression.strip()
     
+    # Detectar comas (múltiples expresiones)
+    if ',' in expression:
+        # Sugerir separar las expresiones
+        parts = [p.strip() for p in expression.split(',') if p.strip()]
+        if len(parts) > 1:
+            if len(parts) == 2:
+                raise ValueError(
+                    f"❌ La coma (,) NO es un operador matemático válido.\n\n"
+                    f"📚 Explicación:\n"
+                    f"La coma se usa en programación para separar elementos de una lista, pero en matemáticas no es una operación.\n\n"
+                    f"✅ Solución: Calcula cada expresión por separado:\n\n"
+                    f"   1) {parts[0]}\n"
+                    f"   2) {parts[1]}"
+                )
+            else:
+                suggestions = '\n'.join([f"   {i+1}) {part}" for i, part in enumerate(parts)])
+                raise ValueError(
+                    f"❌ La coma (,) NO es un operador matemático válido.\n\n"
+                    f"📚 Explicación:\n"
+                    f"La coma se usa en programación para separar elementos, pero en matemáticas no existe como operación.\n\n"
+                    f"✅ Solución: Calcula cada expresión por separado:\n\n{suggestions}"
+                )
+    
     # Lista de caracteres/palabras prohibidas para evitar eval malicioso
     forbidden = [
         "__", "import", "exec", "eval", "compile", "open", "file",
@@ -96,6 +119,10 @@ class RateLimiter:
 
 # Instancia global
 rate_limiter = RateLimiter()
+
+
+
+
 
 
 
