@@ -436,6 +436,23 @@ window.addEventListener('load', () => {
     elements.expressionInput.focus();
 });
 
+// =============================================
+// Acordeón para secciones de info
+// =============================================
+
+function toggleAccordion(contentId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(contentId + 'Icon');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        icon.textContent = '▲';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '▼';
+    }
+}
+
 console.log('EduCalc PWA cargado ✅');
 console.log('API URL:', API_URL);
 
