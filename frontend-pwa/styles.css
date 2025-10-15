@@ -741,9 +741,20 @@ body::after {
 }
 
 .step-detail {
-    font-size: 0.9rem;
-    color: var(--gray-600);
-    line-height: 1.5;
+    font-size: 0.95rem;
+    color: var(--gray-700);
+    line-height: 1.8;
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: var(--radius);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.step-detail strong {
+    color: var(--primary);
+    font-weight: 600;
 }
 
 /* === Error Card === */
@@ -808,6 +819,45 @@ body::after {
     color: white;
     margin-bottom: var(--spacing-lg);
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos para acordeón */
+.accordion-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: all 0.3s ease;
+    margin-bottom: 0 !important;
+    padding: 0.5rem 0;
+}
+
+.accordion-header:hover {
+    color: rgba(255, 255, 255, 0.8);
+    transform: translateX(4px);
+}
+
+.accordion-icon {
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+}
+
+.accordion-content {
+    padding-top: var(--spacing-lg);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .info-list {

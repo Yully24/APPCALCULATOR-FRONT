@@ -284,13 +284,17 @@ function renderSteps(steps) {
         const stepCard = document.createElement('div');
         stepCard.className = 'step-card';
         
+        // Formatear descripción y detalle preservando saltos de línea
+        const formattedDescription = formatTextWithLineBreaks(step.description);
+        const formattedDetail = step.detail ? formatTextWithLineBreaks(step.detail) : '';
+        
         stepCard.innerHTML = `
             <div class="step-header">
                 <div class="step-number">${step.step}</div>
-                <div class="step-description">${escapeHtml(step.description)}</div>
+                <div class="step-description">${formattedDescription}</div>
             </div>
             ${step.expression ? `<div class="step-expression">${escapeHtml(step.expression)}</div>` : ''}
-            ${step.detail ? `<div class="step-detail">${escapeHtml(step.detail)}</div>` : ''}
+            ${step.detail ? `<div class="step-detail">${formattedDetail}</div>` : ''}
         `;
         
         elements.stepsList.appendChild(stepCard);
@@ -318,7 +322,9 @@ function hideResult() {
 }
 
 function showError(message) {
-    elements.errorMessage.textContent = message;
+    // Convertir saltos de línea a <br> y escapar HTML
+    const formattedMessage = formatTextWithLineBreaks(message);
+    elements.errorMessage.innerHTML = formattedMessage;
     elements.errorCard.style.display = 'block';
     
     // Scroll to error
@@ -351,6 +357,22 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function formatTextWithLineBreaks(text) {
+    // Escapar HTML primero para seguridad
+    const escaped = escapeHtml(text);
+    
+    // Convertir saltos de línea a <br>
+    let formatted = escaped.replace(/\n/g, '<br>');
+    
+    // Convertir listas con viñetas (•) a formato HTML más legible
+    formatted = formatted.replace(/•\s*/g, '<br>• ');
+    
+    // Añadir espaciado a flechas
+    formatted = formatted.replace(/👉/g, '<strong>👉</strong>');
+    
+    return formatted;
 }
 
 // =============================================
@@ -435,6 +457,23 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('load', () => {
     elements.expressionInput.focus();
 });
+
+// =============================================
+// Acordeón para secciones de info
+// =============================================
+
+function toggleAccordion(contentId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(contentId + 'Icon');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        icon.textContent = '▲';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '▼';
+    }
+}
 
 console.log('EduCalc PWA cargado ✅');
 console.log('API URL:', API_URL);

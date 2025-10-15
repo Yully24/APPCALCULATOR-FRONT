@@ -41,29 +41,37 @@
             
             <!-- Info Section -->
             <div class="info-section">
-                <div class="info-card">
-                    <h3 class="info-title">💡 ¿Cómo usar?</h3>
-                    <ol class="info-list">
-                        <li>Escribe tu expresión matemática</li>
-                        <li>Selecciona el tipo de operación (o déjalo en Auto)</li>
-                        <li>Presiona "Calcular"</li>
-                        <li>Ve el resultado y los pasos explicados</li>
-                    </ol>
+                <div class="info-card accordion-card">
+                    <h3 class="info-title accordion-header" onclick="toggleAccordion('howToUse')">
+                        💡 ¿Cómo usar? <span class="accordion-icon" id="howToUseIcon">▼</span>
+                    </h3>
+                    <div class="accordion-content" id="howToUse" style="display: none;">
+                        <ol class="info-list">
+                            <li>Escribe tu expresión matemática</li>
+                            <li>Selecciona el tipo de operación (o déjalo en Auto)</li>
+                            <li>Presiona "Calcular"</li>
+                            <li>Ve el resultado y los pasos explicados</li>
+                        </ol>
+                    </div>
                 </div>
 
-                <div class="info-card">
-                    <h3 class="info-title">📚 Operaciones soportadas</h3>
-                    <p style="margin-bottom: 16px; color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 500;">✨ Escribe UNA expresión a la vez</p>
-                    <ul class="info-list">
-                        <li><strong>Aritmética:</strong> 450/3</li>
-                        <li><strong>Álgebra:</strong> 2*x + 3*x | 5*x - 2*x</li>
-                        <li><strong>Ecuaciones:</strong> 2*x + 5 = 15 | 3*x - 7 = 14</li>
-                    </ul>
+                <div class="info-card accordion-card">
+                    <h3 class="info-title accordion-header" onclick="toggleAccordion('operations')">
+                        📚 Operaciones soportadas <span class="accordion-icon" id="operationsIcon">▼</span>
+                    </h3>
+                    <div class="accordion-content" id="operations" style="display: none;">
+                        <p style="margin-bottom: 16px; color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 500;">✨ Escribe UNA expresión a la vez</p>
+                        <ul class="info-list">
+                            <li><strong>Aritmética:</strong> 450/3</li>
+                            <li><strong>Álgebra:</strong> 2*x + 3*x | 5*x - 2*x</li>
+                            <li><strong>Ecuaciones:</strong> 2*x + 5 = 15 | 3*x - 7 = 14</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             
             <!-- Calculator Card -->
-            <div class="card calculator-card">
+            <div class="card calculator-card" style="margin-top: 2rem;">
                 <h2 class="card-title">Calculadora</h2>
                 
                 <form id="calculatorForm" class="calculator-form">
