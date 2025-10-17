@@ -1,6 +1,6 @@
 {
   "buildCommand": null,
-  "outputDirectory": "educalc-pages",
+  "outputDirectory": ".",
   "framework": null,
   "installCommand": null
 }
