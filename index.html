@@ -14,7 +14,18 @@
     <meta name="apple-mobile-web-app-title" content="EduCalc">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=2025-01-25-v9405">
+    
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    
+    <!-- Cache busting - actualizar en cada despliegue -->
+    <meta name="version" content="2025-01-25-v9405">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <!-- Preconnect para optimizar -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,14 +68,15 @@
 
                 <div class="info-card accordion-card">
                     <h3 class="info-title accordion-header" onclick="toggleAccordion('operations')">
-                        📚 Operaciones soportadas <span class="accordion-icon" id="operationsIcon">▼</span>
+                        📚 ¿Qué puedes escribir? <span class="accordion-icon" id="operationsIcon">▼</span>
                     </h3>
                     <div class="accordion-content" id="operations" style="display: none;">
-                        <p style="margin-bottom: 16px; color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 500;">✨ Escribe UNA expresión a la vez</p>
                         <ul class="info-list">
-                            <li><strong>Aritmética:</strong> 450/3</li>
-                            <li><strong>Álgebra:</strong> 2*x + 3*x | 5*x - 2*x</li>
-                            <li><strong>Ecuaciones:</strong> 2*x + 5 = 15 | 3*x - 7 = 14</li>
+                            <li>📊 <strong>Números:</strong> 2+3, 450/3, (10-5)/2</li>
+                            <li>🔢 <strong>Potencias:</strong> 2**3, 5^2</li>
+                            <li>🔲 <strong>Raíces:</strong> sqrt(16)</li>
+                            <li>🔤 <strong>Con letras:</strong> 2*x+3, x^2</li>
+                            <li>⚖️ <strong>Ecuaciones:</strong> 2*x=10</li>
                         </ul>
                     </div>
                 </div>
@@ -86,6 +98,13 @@
                             required
                             autocomplete="off"
                         >
+                        <!-- Preview matemático en tiempo real -->
+                        <div id="expressionPreview" class="expression-preview">
+                            <div class="preview-label">Vista previa:</div>
+                            <div id="previewContent" class="preview-content">
+                                <span class="preview-placeholder">Escribe una expresión...</span>
+                            </div>
+                        </div>
                         <small class="form-hint">Escribe tu expresión matemática</small>
                     </div>
 
@@ -118,8 +137,9 @@
                     <div class="examples-list">
                         <button class="example-btn" data-expr="2 + 3 * 4" data-mode="arithmetic">2 + 3 × 4</button>
                         <button class="example-btn" data-expr="450/3" data-mode="arithmetic">450/3</button>
+                        <button class="example-btn" data-expr="2**3" data-mode="arithmetic">2³ (potencia)</button>
+                        <button class="example-btn" data-expr="sqrt(16)" data-mode="arithmetic">√16 (raíz)</button>
                         <button class="example-btn" data-expr="2*x + 5 = 15" data-mode="solve">2x + 5 = 15</button>
-                        <button class="example-btn" data-expr="(10 - 5) / 2" data-mode="arithmetic">(10 - 5) / 2</button>
                     </div>
                 </div>
             </div>
@@ -184,7 +204,7 @@
     </button>
 
     <!-- Scripts -->
-    <script src="app.js"></script>
+    <script src="app.js?v=2025-01-25-v9405"></script>
     <script>
         // Register Service Worker
         if ('serviceWorker' in navigator) {

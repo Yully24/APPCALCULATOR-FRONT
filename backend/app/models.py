@@ -7,6 +7,7 @@ class Step(BaseModel):
     step: int = Field(..., description="Número del paso")
     description: str = Field(..., description="Descripción breve del paso")
     expression: Optional[str] = Field(None, description="Expresión matemática en este paso")
+    expression_latex: Optional[str] = Field(None, description="Expresión en formato LaTeX")
     detail: Optional[str] = Field(None, description="Explicación detallada del paso")
 
     class Config:
@@ -102,6 +103,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     environment: str
+
 
 
 

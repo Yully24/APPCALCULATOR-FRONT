@@ -279,6 +279,59 @@ body::after {
     color: var(--gray-500);
 }
 
+/* === Expression Preview === */
+.expression-preview {
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f1ff 100%);
+    border: 2px solid var(--primary-light);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    transition: all 0.3s ease;
+}
+
+.expression-preview:has(.preview-content:not(:empty)) {
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.preview-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.preview-content {
+    font-size: 1.3rem;
+    color: var(--gray-800);
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xs) 0;
+}
+
+.preview-placeholder {
+    font-size: 0.9rem;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+.preview-content .katex {
+    font-size: 1.4em;
+}
+
+.preview-error {
+    color: var(--error);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 /* === Buttons === */
 .btn {
     padding: var(--spacing-md) var(--spacing-xl);
@@ -734,10 +787,22 @@ body::after {
 .step-expression {
     font-family: 'Courier New', monospace;
     background: white;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
     border-radius: var(--radius);
     margin: var(--spacing-sm) 0;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
+    overflow-x: auto;
+    text-align: center;
+    line-height: 1.8;
+}
+
+/* Estilos para expresiones LaTeX renderizadas */
+.step-expression .katex {
+    font-size: 1.2em;
+}
+
+.step-expression .katex-display {
+    margin: 0;
 }
 
 .step-detail {

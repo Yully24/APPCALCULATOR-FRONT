@@ -22,7 +22,10 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "utilities"],
+  "categories": [
+    "education",
+    "utilities"
+  ],
   "screenshots": [],
   "shortcuts": [
     {
@@ -32,6 +35,7 @@
       "url": "/",
       "icons": []
     }
-  ]
+  ],
+  "version": "2025-01-25-v9405",
+  "version_name": "2025-01-25-v9405"
 }
-

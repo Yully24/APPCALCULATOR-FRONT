@@ -3,7 +3,7 @@
 // =============================================
 
 // CONFIGURACIÓN - IMPORTANTE: Cambiar esta URL después de desplegar el backend
-const API_URL = 'https://educalc-backend-369988664819.us-central1.run.app/';
+const API_URL = 'https://educalc-backend-ntw33zfv2a-uc.a.run.app/';
 //'http://localhost:8000'; // Cambiar a tu URL de Render después del deploy
 // Ejemplo: const API_URL = 'https://educalc-backend-xxxx.onrender.com';
 
@@ -19,6 +19,7 @@ let stepsVisible = false;
 const elements = {
     form: document.getElementById('calculatorForm'),
     expressionInput: document.getElementById('expression'),
+    previewContent: document.getElementById('previewContent'),
     modeSelect: document.getElementById('mode'),
     calculateBtn: document.getElementById('calculateBtn'),
     btnText: document.querySelector('.btn-text'),
@@ -62,9 +63,13 @@ elements.exampleBtns.forEach(btn => {
         const mode = btn.getAttribute('data-mode');
         elements.expressionInput.value = expr;
         elements.modeSelect.value = mode;
+        updateExpressionPreview(); // Actualizar preview
         elements.expressionInput.focus();
     });
 });
+
+// Preview en tiempo real
+elements.expressionInput.addEventListener('input', updateExpressionPreview);
 
 // =============================================
 // Funciones principales
@@ -177,8 +182,20 @@ function showResult(result) {
     currentResult = result;
     stepsVisible = false;
     
-    // Llenar datos
-    elements.originalExpression.textContent = result.original;
+    // Llenar datos - Renderizar expresión original con LaTeX si está disponible
+    if (result.steps && result.steps[0] && result.steps[0].expression_latex) {
+        try {
+            katex.render(result.steps[0].expression_latex, elements.originalExpression, {
+                throwOnError: false,
+                displayMode: false,
+                output: 'html'
+            });
+        } catch (e) {
+            elements.originalExpression.textContent = result.original;
+        }
+    } else {
+        elements.originalExpression.textContent = result.original;
+    }
     
     // Renderizar pasos
     renderSteps(result.steps);
@@ -293,12 +310,15 @@ function renderSteps(steps) {
                 <div class="step-number">${step.step}</div>
                 <div class="step-description">${formattedDescription}</div>
             </div>
-            ${step.expression ? `<div class="step-expression">${escapeHtml(step.expression)}</div>` : ''}
+            ${step.expression ? `<div class="step-expression math-expression" data-latex="${step.expression_latex || ''}">${escapeHtml(step.expression)}</div>` : ''}
             ${step.detail ? `<div class="step-detail">${formattedDetail}</div>` : ''}
         `;
         
         elements.stepsList.appendChild(stepCard);
     });
+    
+    // Renderizar todas las expresiones LaTeX
+    renderMathExpressions();
 }
 
 function toggleSteps() {
@@ -373,6 +393,122 @@ function formatTextWithLineBreaks(text) {
     formatted = formatted.replace(/👉/g, '<strong>👉</strong>');
     
     return formatted;
+}
+
+function renderMathExpressions() {
+    // Renderizar todas las expresiones matemáticas con KaTeX
+    const mathElements = document.querySelectorAll('.math-expression');
+    
+    mathElements.forEach(element => {
+        const latex = element.getAttribute('data-latex');
+        if (latex && latex.trim() !== '') {
+            try {
+                // Renderizar LaTeX con KaTeX
+                katex.render(latex, element, {
+                    throwOnError: false,
+                    displayMode: true,  // Display mode para mejor visualización
+                    output: 'html'
+                });
+            } catch (error) {
+                console.warn('Error renderizando LaTeX:', latex, error);
+                // Si falla, mantener el texto original
+            }
+        }
+    });
+}
+
+function convertToLaTeX(expression) {
+    /**
+     * Convierte expresión de texto plano a LaTeX
+     * Ejemplos:
+     * - 2/3 → \frac{2}{3}
+     * - x^2 o x**2 → x^{2}
+     * - 2*x → 2x
+     * - sqrt(16) → \sqrt{16}
+     */
+    
+    if (!expression || expression.trim() === '') {
+        return '';
+    }
+    
+    let latex = expression.trim();
+    
+    // Funciones matemáticas PRIMERO (antes de modificar paréntesis)
+    // Raíz cuadrada: sqrt(x) → \sqrt{x}
+    latex = latex.replace(/sqrt\(([^)]+)\)/gi, '\\sqrt{$1}');
+    
+    // Otras funciones trigonométricas
+    latex = latex.replace(/sin\(/gi, '\\sin(');
+    latex = latex.replace(/cos\(/gi, '\\cos(');
+    latex = latex.replace(/tan\(/gi, '\\tan(');
+    latex = latex.replace(/log\(/gi, '\\log(');
+    latex = latex.replace(/ln\(/gi, '\\ln(');
+    
+    // Convertir ** y ^ a exponentes (antes de tocar *)
+    // Exponentes con paréntesis: x**(2+1) → x^{2+1}
+    latex = latex.replace(/\*\*\(([^)]+)\)/g, '^{$1}');
+    latex = latex.replace(/\^\(([^)]+)\)/g, '^{$1}');
+    
+    // Exponentes simples: x**2 o x^2 → x^{2}
+    latex = latex.replace(/\*\*([a-zA-Z0-9]+)/g, '^{$1}');
+    latex = latex.replace(/\^([a-zA-Z0-9]+)/g, '^{$1}');
+    
+    // Detectar y convertir fracciones ANTES de modificar *
+    // Fracciones con paréntesis en ambos lados: (a+b)/(c+d)
+    latex = latex.replace(/\(([^()]+)\)\s*\/\s*\(([^()]+)\)/g, '\\frac{$1}{$2}');
+    
+    // Fracciones con paréntesis en numerador: (a+b)/c
+    latex = latex.replace(/\(([^()]+)\)\s*\/\s*([^\s()+-/]+)/g, '\\frac{$1}{$2}');
+    
+    // Fracciones con paréntesis en denominador: a/(b+c)
+    latex = latex.replace(/([^\s()+-/]+)\s*\/\s*\(([^()]+)\)/g, '\\frac{$1}{$2}');
+    
+    // Fracciones simples: 2/3, x/y, 450/3
+    latex = latex.replace(/([a-zA-Z0-9.]+)\s*\/\s*([a-zA-Z0-9.]+)/g, '\\frac{$1}{$2}');
+    
+    // Ahora reemplazar operadores comunes
+    // Multiplicación implícita número*variable: 2*x → 2x
+    latex = latex.replace(/(\d+)\s*\*\s*([a-zA-Z])/g, '$1$2');
+    
+    // Resto de multiplicaciones con símbolo ×
+    latex = latex.replace(/\*/g, ' \\times ');
+    
+    // División como símbolo
+    latex = latex.replace(/÷/g, ' \\div ');
+    
+    // Limpiar múltiples espacios
+    latex = latex.replace(/\s+/g, ' ').trim();
+    
+    // Eliminar \\times innecesarios cerca de paréntesis
+    latex = latex.replace(/\\times\s*\(/g, '(');
+    latex = latex.replace(/\)\s*\\times\s*\(/g, ')(');
+    
+    return latex;
+}
+
+function updateExpressionPreview() {
+    const expression = elements.expressionInput.value.trim();
+    
+    if (!expression) {
+        elements.previewContent.innerHTML = '<span class="preview-placeholder">Escribe una expresión...</span>';
+        return;
+    }
+    
+    try {
+        // Convertir a LaTeX
+        const latexExpr = convertToLaTeX(expression);
+        
+        // Renderizar con KaTeX
+        katex.render(latexExpr, elements.previewContent, {
+            throwOnError: false,
+            displayMode: true,
+            output: 'html'
+        });
+    } catch (error) {
+        console.warn('Error en preview:', error);
+        // Si falla, mostrar la expresión tal cual
+        elements.previewContent.textContent = expression;
+    }
 }
 
 // =============================================
@@ -456,6 +592,10 @@ document.addEventListener('keydown', (e) => {
 
 window.addEventListener('load', () => {
     elements.expressionInput.focus();
+    // Inicializar preview si hay valor
+    if (elements.expressionInput.value.trim()) {
+        updateExpressionPreview();
+    }
 });
 
 // =============================================

@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from app.models import Step
 import logging
 from decimal import Decimal
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -19,29 +20,52 @@ def format_number(value) -> str:
     Formatea un número de manera inteligente:
     - Enteros sin decimales: 14 en lugar de 14.0000000
     - Decimales con máximo 6 cifras significativas: 3.141593
-    - Elimina ceros innecesarios: 2.5 en lugar de 2.500000
+    - Elimina ceros innecesarios: 2.72 en lugar de 2.72000000
     """
     try:
-        # Convertir a float
+        # Convertir a float (maneja objetos SymPy también)
         num = float(value)
         
         # Verificar si es un número entero
         if num == int(num):
             return str(int(num))
         
-        # Para decimales, usar 6 cifras significativas y eliminar ceros finales
-        formatted = f"{num:.10g}"  # 10 cifras significativas máximo
-        
-        # Si tiene más de 6 decimales, redondear a 6
-        if '.' in formatted:
-            parts = formatted.split('.')
-            if len(parts[1]) > 6:
-                formatted = f"{num:.6f}".rstrip('0').rstrip('.')
+        # Para decimales, usar formato que elimine ceros innecesarios
+        # Redondear a 10 decimales para evitar errores de punto flotante
+        formatted = f"{num:.10f}".rstrip('0').rstrip('.')
         
         return formatted
     except:
         # Si falla el formateo, devolver el string original
         return str(value)
+
+
+def to_latex(expression) -> str:
+    """
+    Convierte una expresión a formato LaTeX
+    """
+    try:
+        # Si es un string simple (como número), intentar parsearlo
+        if isinstance(expression, str):
+            # Si es solo un número, retornarlo directamente
+            try:
+                num = float(expression)
+                return format_number(num)
+            except:
+                # Intentar convertir a expresión SymPy
+                try:
+                    expr = sympify(expression)
+                    return latex(expr)
+                except:
+                    # Si falla, devolver el string original limpio
+                    return expression
+        
+        # Si es una expresión SymPy, usar latex()
+        latex_str = latex(expression)
+        return latex_str
+    except:
+        # Si todo falla, convertir a string
+        return str(expression)
 
 
 class CalculatorEngine:
@@ -198,37 +222,24 @@ class CalculatorEngine:
                 step=1,
                 description="💡 Expresión original",
                 expression=expression,
+                expression_latex=to_latex(expr),
                 detail="Vamos a resolver esta expresión matemática paso a paso, siguiendo el orden correcto de operaciones."
             ))
             
-            # Paso 2: Explicar PEMDAS y mostrar operaciones
-            operations = self._identify_operations(expr)
-            operations_text = f"Operaciones presentes: {', '.join(operations)}" if operations else "Operaciones básicas"
+            # Generar pasos intermedios del cálculo
+            calculation_steps = self._generate_calculation_steps(expression, expr)
+            steps.extend(calculation_steps)
             
-            steps.append(Step(
-                step=2,
-                description="📋 Identificar operaciones y orden",
-                expression=str(expr),
-                detail=f"{operations_text}\n\nRecuerda el orden PEMDAS:\n• Paréntesis\n• Exponentes\n• Multiplicación/División (izquierda a derecha)\n• Suma/Resta (izquierda a derecha)\n\nPrimero resolvemos multiplicación/división, luego suma/resta."
-            ))
-            
-            # Paso 3: Mostrar el proceso
-            steps.append(Step(
-                step=len(steps) + 1,
-                description="✏️ Resolver paso a paso",
-                expression=expression,
-                detail=f"Seguimos el orden PEMDAS:\n\n1️⃣ Primero: Multiplicación/División\n2️⃣ Después: Suma/Resta\n\nVamos a resolver cada operación en el orden correcto."
-            ))
-            
-            # Paso 4: Evaluar y mostrar resultado
+            # Paso final: Evaluar y mostrar resultado
             result = expr.evalf()
             result_formatted = format_number(result)
             
-            # Paso 4: Resultado final
+            # Resultado final
             steps.append(Step(
                 step=len(steps) + 1,
                 description="✅ Resultado final",
                 expression=result_formatted,
+                expression_latex=to_latex(result_formatted),
                 detail=f"🎉 La respuesta es {result_formatted}"
             ))
             
@@ -252,12 +263,14 @@ class CalculatorEngine:
                         step=1,
                         description="Expresión",
                         expression=expression,
+                        expression_latex=to_latex(expr),
                         detail="Calculando resultado..."
                     ).model_dump(),
                     Step(
                         step=2,
                         description="Resultado",
                         expression=result_formatted,
+                        expression_latex=to_latex(result_formatted),
                         detail=f"El resultado es: {result_formatted}"
                     ).model_dump()
                 ],
@@ -351,6 +364,119 @@ class CalculatorEngine:
         
         return "unknown", []
     
+    def _generate_calculation_steps(self, expression: str, expr) -> List[Step]:
+        """
+        Genera pasos intermedios para expresiones compuestas
+        """
+        steps = []
+        current_expr = expression
+        step_num = 2
+        
+        try:
+            # Paso 2: Explicar PEMDAS
+            steps.append(Step(
+                step=step_num,
+                description="📋 Orden de operaciones (PEMDAS)",
+                expression=current_expr,
+                expression_latex=to_latex(expr),
+                detail="Seguimos el orden PEMDAS:\n\n1️⃣ Paréntesis\n2️⃣ Exponentes\n3️⃣ Multiplicación/División (izquierda a derecha)\n4️⃣ Suma/Resta (izquierda a derecha)"
+            ))
+            step_num += 1
+            
+            # Procesar paréntesis primero
+            parentheses_processed = self._process_parentheses(current_expr)
+            if parentheses_processed != current_expr:
+                steps.append(Step(
+                    step=step_num,
+                    description="🔧 Resolver paréntesis",
+                    expression=parentheses_processed,
+                    expression_latex=to_latex(sympify(parentheses_processed)),
+                    detail="Resolvemos las operaciones dentro de los paréntesis primero."
+                ))
+                current_expr = parentheses_processed
+                step_num += 1
+            
+            # Procesar multiplicaciones y divisiones
+            md_processed = self._process_multiplication_division(current_expr)
+            if md_processed != current_expr:
+                steps.append(Step(
+                    step=step_num,
+                    description="✖️ Resolver multiplicación/división",
+                    expression=md_processed,
+                    expression_latex=to_latex(sympify(md_processed)),
+                    detail="Resolvemos multiplicaciones y divisiones de izquierda a derecha."
+                ))
+                current_expr = md_processed
+                step_num += 1
+            
+            # Procesar sumas y restas
+            as_processed = self._process_addition_subtraction(current_expr)
+            if as_processed != current_expr:
+                steps.append(Step(
+                    step=step_num,
+                    description="➕ Resolver suma/resta",
+                    expression=as_processed,
+                    expression_latex=to_latex(sympify(as_processed)),
+                    detail="Resolvemos sumas y restas de izquierda a derecha."
+                ))
+                current_expr = as_processed
+                step_num += 1
+            
+        except Exception as e:
+            # Si hay error, agregar paso genérico
+            steps.append(Step(
+                step=step_num,
+                description="✏️ Resolver paso a paso",
+                expression=expression,
+                expression_latex=to_latex(expr),
+                detail="Aplicamos el orden PEMDAS para resolver la expresión."
+            ))
+        
+        return steps
+    
+    def _process_parentheses(self, expression: str) -> str:
+        """
+        Procesa las operaciones dentro de paréntesis
+        """
+        import re
+        
+        # Buscar paréntesis simples (sin anidamiento)
+        pattern = r'\(([^()]+)\)'
+        
+        def replace_parentheses(match):
+            inner_expr = match.group(1)
+            try:
+                # Usar sympify para evaluación más segura
+                result = sympify(inner_expr)
+                # Si es un número, devolverlo formateado
+                if result.is_number:
+                    return format_number(float(result))
+                else:
+                    return str(result)
+            except:
+                return match.group(0)  # Si no se puede evaluar, mantener original
+        
+        # Aplicar reemplazo
+        processed = re.sub(pattern, replace_parentheses, expression)
+        
+        return processed
+    
+    def _process_multiplication_division(self, expression: str) -> str:
+        """
+        Procesa multiplicaciones y divisiones de izquierda a derecha
+        """
+        # Esta es una implementación simplificada
+        # En una versión más completa, se procesarían paso a paso
+        return expression
+    
+    def _process_addition_subtraction(self, expression: str) -> str:
+        """
+        Procesa sumas y restas de izquierda a derecha
+        """
+        # Esta es una implementación simplificada
+        # En una versión más completa, se procesarían paso a paso
+        return expression
+    
     def _explain_division(self, dividend: float, divisor: float) -> Dict[str, Any]:
         """
         Explicación educativa detallada para división
@@ -361,11 +487,15 @@ class CalculatorEngine:
         dividend_int = int(dividend) if dividend == int(dividend) else dividend
         divisor_int = int(divisor) if divisor == int(divisor) else divisor
         
+        # Crear expresión SymPy para LaTeX
+        div_expr = sympify(f"{dividend_int}/{divisor_int}")
+        
         # Paso 1: Introducción conceptual
         steps.append(Step(
             step=1,
             description="💡 ¿Qué significa dividir?",
             expression=f"{dividend_int} ÷ {divisor_int}",
+            expression_latex=to_latex(div_expr),
             detail="Dividir es repartir en partes iguales.\n\nPor ejemplo:\nSi tienes {} {} y los quieres repartir entre {} {}, la división te dice cuánto le toca a cada uno.".format(
                 dividend_int,
                 "caramelos" if dividend_int != 1 else "caramelo",
@@ -379,6 +509,7 @@ class CalculatorEngine:
             step=2,
             description="✏️ ¿Qué es {} ÷ {}?".format(dividend_int, divisor_int),
             expression=f"{dividend_int} ÷ {divisor_int}",
+            expression_latex=to_latex(div_expr),
             detail="Eso quiere decir:\n¿Cuántas veces cabe el {} en el {}?\nO: ¿Cuánto le toca a cada uno si repartimos {} entre {} {}?".format(
                 divisor_int,
                 dividend_int,
@@ -399,10 +530,12 @@ class CalculatorEngine:
             steps.extend(self._explain_long_division(int(dividend_int), int(divisor_int)))
         else:
             # División simple
+            result_expr = sympify(f"Eq({dividend_int}/{divisor_int}, {result_int})")
             steps.append(Step(
                 step=3,
                 description="🔢 Resolver la división",
                 expression=f"{dividend_int} ÷ {divisor_int} = {result_int}",
+                expression_latex=f"\\frac{{{dividend_int}}}{{{divisor_int}}} = {result_int}",
                 detail="Para resolver esta división, pensamos:\n¿Cuántas veces cabe el {} en {}?\n👉 Cabe {} veces{}".format(
                     divisor_int,
                     dividend_int,
@@ -413,10 +546,12 @@ class CalculatorEngine:
         
         # Paso 4: Verificación
         if remainder == 0:
+            verify_expr = f"{divisor_int} \\times {result_int} = {dividend_int}"
             steps.append(Step(
                 step=len(steps) + 1,
                 description="✓ Verificar el resultado",
                 expression=f"{divisor_int} × {result_int} = {dividend_int}",
+                expression_latex=verify_expr,
                 detail="Podemos verificar multiplicando: {} × {} = {}. ¡Correcto! ✓".format(
                     divisor_int,
                     result_int,
@@ -425,10 +560,12 @@ class CalculatorEngine:
             ))
         
         # Paso final: Resultado con contexto
+        final_latex = f"\\frac{{{dividend_int}}}{{{divisor_int}}} = {result_int}"
         steps.append(Step(
             step=len(steps) + 1,
             description="✅ Resultado final",
             expression=f"{dividend_int} ÷ {divisor_int} = {result_int}",
+            expression_latex=final_latex,
             detail="🎉 Entonces, {} ÷ {} = {}\n\n{}".format(
                 dividend_int,
                 divisor_int,
@@ -681,6 +818,7 @@ class CalculatorEngine:
             step=1,
             description="💡 ¿Qué significa una potencia?",
             expression=f"{base_int}^{exp_int}",
+            expression_latex=f"{base_int}^{{{exp_int}}}",
             detail="Una potencia significa multiplicar un número por sí mismo varias veces.\n\n{}^{} significa multiplicar {} por sí mismo {} veces.".format(
                 base_int, exp_int, base_int, exp_int
             )
@@ -689,10 +827,12 @@ class CalculatorEngine:
         # Explicación visual (si el exponente es pequeño)
         if exp_int <= 5 and exp_int == int(exp_int) and exp_int > 0:
             mult_representation = " × ".join([str(base_int)] * int(exp_int))
+            mult_latex = " \\times ".join([str(base_int)] * int(exp_int))
             steps.append(Step(
                 step=2,
                 description="✏️ Representar como multiplicación",
                 expression=mult_representation,
+                expression_latex=mult_latex,
                 detail="Podemos escribir esto como:\n{}^{} = {}".format(
                     base_int, exp_int, mult_representation
                 )
@@ -703,6 +843,7 @@ class CalculatorEngine:
             step=len(steps) + 1,
             description="🔢 Calcular la potencia",
             expression=f"{base_int}^{exp_int} = {result_int}",
+            expression_latex=f"{base_int}^{{{exp_int}}} = {result_int}",
             detail="Calculamos: {}^{} = {}".format(base_int, exp_int, result_int)
         ))
         
@@ -711,6 +852,7 @@ class CalculatorEngine:
             step=len(steps) + 1,
             description="✅ Resultado final",
             expression=str(result_int),
+            expression_latex=str(result_int),
             detail="🎉 Entonces, {}^{} = {}".format(base_int, exp_int, result_int)
         ))
         
@@ -726,19 +868,24 @@ class CalculatorEngine:
         """
         steps = []
         
-        # Paso 1: Introducción a álgebra
-        steps.append(Step(
-            step=1,
-            description="💡 ¿Qué es una expresión algebraica?",
-            expression=expression,
-            detail="Una expresión algebraica usa letras (variables) para representar números desconocidos.\n\nPor ejemplo: En '2x + 3', la 'x' puede valer cualquier número.\n\nVamos a simplificar esta expresión paso a paso."
-        ))
-        
         try:
             expr = sympify(expression)
             
             # Identificar variables
             variables = list(expr.free_symbols)
+            
+            # Si no hay variables, es aritmética pura - redirigir
+            if not variables:
+                return self._arithmetic(expression)
+            
+            # Paso 1: Introducción a álgebra
+            steps.append(Step(
+                step=1,
+                description="💡 ¿Qué es una expresión algebraica?",
+                expression=expression,
+                detail="Una expresión algebraica usa letras (variables) para representar números desconocidos.\n\nPor ejemplo: En '2x + 3', la 'x' puede valer cualquier número.\n\nVamos a simplificar esta expresión paso a paso."
+            ))
+            
             if variables:
                 var_names = ", ".join(str(v) for v in variables)
                 steps.append(Step(
@@ -751,10 +898,11 @@ class CalculatorEngine:
             # Paso: Expandir
             expanded = expand(expr)
             if expanded != expr:
+                expanded_str = format_number(expanded) if expanded.is_number else str(expanded)
                 steps.append(Step(
                     step=len(steps) + 1,
                     description="✏️ Expandir expresión",
-                    expression=str(expanded),
+                    expression=expanded_str,
                     detail="Aplicamos la propiedad distributiva:\na(b + c) = ab + ac\n\nMultiplicamos cada término dentro de los paréntesis."
                 ))
                 expr = expanded
@@ -762,32 +910,38 @@ class CalculatorEngine:
             # Paso: Simplificar
             simplified = simplify(expr)
             if simplified != expr:
+                simplified_str = format_number(simplified) if simplified.is_number else str(simplified)
                 steps.append(Step(
                     step=len(steps) + 1,
                     description="🔢 Simplificar y combinar términos",
-                    expression=str(simplified),
+                    expression=simplified_str,
                     detail="Combinamos los términos semejantes (términos con las mismas variables y exponentes).\n\nPor ejemplo: 2x + 3x = 5x"
                 ))
                 expr = simplified
             
             # Paso final: Resultado
+            # Formatear el resultado si es numérico
+            result_str = str(expr)
+            if expr.is_number:
+                result_str = format_number(expr)
+            
             if len(steps) <= 2:
                 steps.append(Step(
                     step=len(steps) + 1,
                     description="✅ Expresión simplificada",
-                    expression=str(expr),
+                    expression=result_str,
                     detail="Esta expresión ya está en su forma más simple. No necesita más simplificación."
                 ))
             else:
                 steps.append(Step(
                     step=len(steps) + 1,
                     description="✅ Resultado final",
-                    expression=str(expr),
-                    detail=f"🎉 La expresión simplificada es: {expr}\n\nEsta es la forma más sencilla de escribir la expresión original."
+                    expression=result_str,
+                    detail=f"🎉 La expresión simplificada es: {result_str}\n\nEsta es la forma más sencilla de escribir la expresión original."
                 ))
             
             return {
-                "result": str(expr),
+                "result": result_str,
                 "steps": [s.model_dump() for s in steps],
                 "mode": "algebra"
             }
